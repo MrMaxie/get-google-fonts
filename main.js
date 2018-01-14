@@ -9,6 +9,7 @@ const request = require('request')
 const Path    = require('path')
 const fs      = require('fs')
 const mkdirp  = require('mkdirp')
+const cheerio = require('cheerio')
 /**
  * Regular Expressions
  */
@@ -31,7 +32,6 @@ const defaultConfig = {
 	agent:         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
 	throwAtRepeats: true,
 	verbose:        false
-
 }
 /**
  * Parse string by replacing in-string variables with their values from given object
@@ -74,18 +74,24 @@ function parseParameters(url, config) {
  * @return {bluebird}
  */
 function downloadCss(url, config) {
-	return new Promise((resolve, reject) => {
+	let x = new Promise((resolve, reject) => {
 		request({
 			url: url,
 			headers: {
 				'User-Agent': config.agent
 			}
 		}, (error, response, body) => {
+			if(response.statusCode === 400)
+				return reject(new Error('400 Bad Request'))
 			if(error || response.statusCode !== 200)
-				throw new Error(`Cannot to download CSS file (error: '${error}', status: ${response.statusCode})`)
+				return reject(new Error(`Cannot to download CSS file (error: '${error}', status: ${response.statusCode})`))
 			resolve([body, config])
 		})
 	})
+	x.catch(e => {
+		throw e
+	})
+	return x
 }
 /**
  * Returns list of all fonts and their replacements along with new prepared CSS
@@ -104,7 +110,8 @@ function generateList(css, config) {
 		let  filename = ''
 		let i = 0
 		do {
-			 filename = parseString(config.template,{
+			// Transform template into new filename
+			filename = parseString(config.template,{
 				comment: comment,
 				family:  reg.fontFamily.exec(face)[1] || '',
 				_family: (reg.fontFamily.exec(face)[1] || '').replace(/[^a-zA-Z0-9]/gi, '_'),
@@ -174,7 +181,8 @@ function downloadFonts(css, list, config) {
 				if(config.verbose)
 					console.log(`Saving CSS file ${config.css}`)
 				if(e) reject(e)
-				resolve(config)
+				// Generate result object
+				resolve([list, config])
 			})
 		})
 	})

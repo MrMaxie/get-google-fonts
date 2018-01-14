@@ -4,7 +4,7 @@
   "description": "Downloads and adapts Google fonts to working offline",
   "main": "main.js",
   "scripts": {
-    "test": "node ./test.js"
+    "test": "node ./test.js --silent"
   },
   "repository": {
     "type": "git",
@@ -31,6 +31,7 @@
     "bluebird": "3.5.1",
     "request": "2.83.0",
     "mkdirp": "0.5.1",
-    "cli": "1.0.1"
+    "cli": "1.0.1",
+    "cheerio": "1.0.0-rc.2"
   }
 }
