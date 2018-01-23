@@ -3,254 +3,405 @@
  * @author  Maciej (Maxie) Mieńko
  * @license Apache-2.0
  */
-const Promise = require('bluebird')
-const URL     = require('url')
-const request = require('request')
-const Path    = require('path')
-const fs      = require('fs')
-const mkdirp  = require('mkdirp')
-const cheerio = require('cheerio')
-/**
- * Regular Expressions
- */
-const reg = {
-	fontFace:   /\s*(?:\/\*\s*(.*?)\s*\*\/)?[^@]*?@font-face\s*{(?:[^}]*?)}\s*/gi,
-	fontFamily: /font-family\s*:\s*(?:\'|")?([^;]*?)(?:\'|")?\s*;/i,
-	fontWeight: /font-weight\s*:\s*([^;]*?)\s*;/i,
-	fontSource: /(src\s*:[^]*?url\s*\(\s*(?:\'|")?\s*)([^]*?)(\s*(?:\'|")?\s*\)[^;]*?;)/i,
-	filename:   /^.*\/(.*?)\.(.*?)(?:$|\?.*?$)/gi,
+const Q             = require('q')
+const URL           = require('url')
+const parseUrl      = url => URL.parse(url,true,true)
+const path          = require('path')
+const fs            = require('fs')
+const mkdirp        = require('mkdirp')
+const request       = require('request')
+const normalizeUrl  = require('normalize-url')
+
+const REGULAR_EXPRESSIONS = {
+	face:   /\s*(?:\/\*\s*(.*?)\s*\*\/)?[^@]*?@font-face\s*{(?:[^}]*?)}\s*/gi,
+	family: /font-family\s*:\s*(?:\'|")?([^;]*?)(?:\'|")?\s*;/i,
+	weight: /font-weight\s*:\s*([^;]*?)\s*;/i,
+	url:    /url\s*\(\s*(?:\'|")?\s*([^]*?)\s*(?:\'|")?\s*\)\s*?/gi
 }
-/**
- * Default config used as base
- * @type {Object}
- */
-const defaultConfig = {
-	output:        './fonts',
-	path:          './',
-	template:      '%(family)s-%(weight)s-%(comment)s%(i)s.%(ext)s',
-	css:           'fonts.css',
-	agent:         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
-	throwAtRepeats: true,
-	verbose:        false
+const DEFAULT_CONFIG = {
+	outputDir:  './fonts',
+	path:       './',
+	template:   '{family}-{weight}-{comment}{i}.{ext}',
+	cssFile:    'fonts.css',
+	userAgent:  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+							'(KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
+	overwriting: false,
+	verbose:     false,
+	simulate:    false
 }
+
 /**
- * Parse string by replacing in-string variables with their values from given object
- * @param  {String} str
- * @param  {Object} vars
+ * Replace in-string variables with their values from given object
+ * @param  {String} template
+ * @param  {Object} values
  * @return {String}
  */
-function parseString(str, vars) {
-	let newvars = {}
-	for(let key in vars)
-		newvars[key.replace(/[^a-zA-Z0-9_-]/g, '')] = vars[key]
-	for(let key in newvars)
-		str = str.replace(new RegExp(`%\\(${key}\\)s`,'g'), newvars[key])
-	return str
+function format(template, values) {
+	return Object
+		.entries(values)
+		.filter(
+			([key]) => /^[a-z0-9_-]+$/gi.test(key)
+		)
+		.map(
+			([key, value]) =>
+				[new RegExp(`([^{]|^){${key}}([^}]|$)`,'g'), `$1${value}$2`]
+		)
+		.reduce(
+			(str, [regexp, replacement]) => {
+				return str.replace(regexp, replacement)
+			}, template
+		)
+		.replace(/({|}){2}/g, '$1')
 }
 /**
- * Parse parameters and throw error if something went wrong
- * @param  {String} url
+ * Allows to filter config object
  * @param  {Object} config
- * @return {Array}
+ * @return {Object}
  */
-function parseParameters(url, config) {
-	if(typeof url !== 'string')
-		throw new Error('URL must be given as string')
-	url = URL.parse(url,true,true)
-	if(['http:','https:'].indexOf(url.protocol) === -1)
-		throw new Error('URL\'s protocol must be http or https')
-	if(typeof config !== 'object')
-		config = {}
-	let newConfig = {}
-	for(let key in config)
-		if(key in defaultConfig)
-			newConfig[key] = config[key]
-	return [url, Object.assign({}, defaultConfig, newConfig)]
+function filterConfig(config) {
+	return Object
+		.entries(config)
+		.filter(
+			([key, value]) =>
+				typeof value === typeof DEFAULT_CONFIG[key]
+		)
+		.reduce(
+			(obj, [key, value]) => {
+				obj[key] = value
+				return obj
+			}, {}
+		)
 }
 /**
- * Downlaod CSS file
- * @param  {URL}      url
- * @param  {Object}   config
- * @return {bluebird}
+ * Download given url to string
+ * @param  {String}  url
+ * @return {Promise}
  */
-function downloadCss(url, config) {
-	let x = new Promise((resolve, reject) => {
-		request({
-			url: url,
-			headers: {
-				'User-Agent': config.agent
-			}
-		}, (error, response, body) => {
-			if(response.statusCode === 400)
-				return reject(new Error('400 Bad Request'))
-			if(error || response.statusCode !== 200)
-				return reject(new Error(`Cannot to download CSS file (error: '${error}', status: ${response.statusCode})`))
-			resolve([body, config])
-		})
-	})
-	x.catch(e => {
-		throw e
-	})
-	return x
-}
-/**
- * Returns list of all fonts and their replacements along with new prepared CSS
- * @param  {String} css
- * @param  {Object} config
- * @return {Array}
- */
-function generateList(css, config) {
-	if(config.verbose)
-		console.log('Parsing...')
-	let list = {}
-	let newcss = css.replace(reg.fontFace, (face, comment) => {
-		let murl = reg.fontSource.exec(face)
-		let url = URL.parse(murl[2] || '', true, true)
-		let _filename = '' // Memory of last generated filename for detecting dead end of creating name loop
-		let  filename = ''
-		let i = 0
-		do {
-			// Transform template into new filename
-			filename = parseString(config.template,{
-				comment: comment,
-				family:  reg.fontFamily.exec(face)[1] || '',
-				_family: (reg.fontFamily.exec(face)[1] || '').replace(/[^a-zA-Z0-9]/gi, '_'),
-				weight:  reg.fontWeight.exec(face)[1] || '',
-				ext:     Path.extname(url.pathname).replace(/^\.+|\.+$/g, ''),
-				name:    Path.basename(url.pathname,Path.extname(url.pathname)),
-				o:       i + 1,
-				i:       i++ === 0 ? '' : i
-			})
-			// That's mean %(i)s isn't used in template 
-			if(filename === _filename) {
-				if(config.throwAtDuplicate)
-					throw new Error(`Repeating filename found (${filename}). Turn off switch 'throwAtRepeats' and try again for enabling overwriting or use %(i)s in template to avoid repeats.`)
-				break
-			}
-			_filename = filename
-		} while(filename in list)
-		list[filename] = url.href
-		return face.replace(reg.fontSource, murl[1]+config.path+filename+murl[3])
-	})
-	if(!Object.keys(list).length)
-		throw new Error('No @font-faces found')
-	if(config.verbose)
-		console.log(`Found ${Object.keys(list).length} fonts`)
-	return [newcss, list, config]
-}
-/**
- * Download file from given url and save as given path
- * @param  {String}   url
- * @param  {String}   path
- * @return {bluebird}
- */
-function downloadSingleFont(url, path, config) {
-	if(config.verbose)
-		console.log(`Download file ${Path.basename(path)}`)
-	return new Promise((resolve, reject) => {
-		mkdirp(Path.dirname(path), e => {
-			if(e) throw new Error(e)
-			request({
-				url: url,
-				headers: {
-					'User-Agent': config.agent
-				}
-			})
-			.on('error', e => {throw new Error(e)})
-			.on('end', () => resolve())
-			.pipe(fs.createWriteStream(path))
-		})
-	})
-}
-/**
- * Make chain of promises to download all of files given in list and save CSS file
- * @param  {String}   css
- * @param  {Object}   list
- * @param  {Object}   config
- * @return {bluebird}
- */
-function downloadFonts(css, list, config) {
-	let lastStep = Promise.try(() => {})
-	for(let path in list)
-		lastStep = lastStep.then(downloadSingleFont.bind(
-			null, list[path], Path.join(config.output, path), config 
-		))
-	return lastStep.then(() => {
-		return new Promise((resolve, reject) => {
-			fs.writeFile(Path.join(config.output, config.css), css, e => {
-				if(config.verbose)
-					console.log(`Saving CSS file ${config.css}`)
-				if(e) reject(e)
-				// Generate result object
-				resolve([list, config])
-			})
-		})
-	})
-}
-/**
- * Core function, do all job
- * @param  {String}   url
- * @param  {Object}   config
- * @return {bluebird}
- */
-function getByUrl(url, config) {
-	if(config.verbose)
-		console.log('Preparing...')
-	let x = Promise
-		.try(parseParameters.bind(this,url,config))
-		.spread(downloadCss)
-		.spread(generateList)
-		.spread(downloadFonts)
-	if(config.verbose) {
-		x.catch(x => console.error(x))
-		x.then(() => {
-			console.log('Done!')
-		})
-	}
-	return x
-}
-
-/**
- * Alias of 'getByUrl' using query
- * @param  {String}   query
- * @param  {Object}   config
- * @return {bluebird}
- */
-function getByQuery(query, config) {
-	return getByUrl(URL.parse(`https://fonts.googleapis.com/css?${query}`).href, config)
-}
-
-/**
- * Alias of 'getByUrl' using object
- * @param  {Object}   families
- * @param  {Array}    subsets
- * @param  {Object}   config
- * @return {bluebird}
- */
-function getByObject(families, subsets, config) {
-	let newFamilies = []
-	for(let key in families) {
-		key = key.trim().replace(/\s/g, '+')
-		let val = families[key]
-		if(val instanceof Array)
-			val = val.join(',')
-		if(typeof val === 'string' && String(val).length > 0) {
-			newFamilies.push(`${key}:${val}`)
-			continue
+function downloadString(url, {userAgent}) {
+	let deferred  = Q.defer()
+	let startTime = Date.now()
+	let data = ''
+	request({
+		method: 'GET',
+		url: url,
+		headers: {
+			'User-Agent': userAgent
 		}
-		newFamilies.push(key)
+	}, function(error, response, body) {
+		if(error) {
+			deferred.reject(new Error(error))
+			return;
+		}
+		deferred.resolve({
+			time: Date.now() - startTime,
+			result: body,
+			statusCode: response.statusCode
+		})
+	})
+	return deferred.promise
+}
+/**
+ * Array parser helper
+ * @param  {Mixed}  arrayLike
+ * @param  {String} delimiter
+ * @return {Array}
+ */
+function arrayFrom(arrayLike, delimiter=',') {
+	if(typeof arrayLike === 'string')
+		return arrayLike.split(delimiter)
+	return Array.from(arrayLike)
+}
+/**
+ * Normalize given URL
+ * @param  {String} url
+ * @return {String}
+ */
+function repairUrl(url) {
+	return normalizeUrl(url
+		.replace(/&amp;/gi, '&')
+		.replace(/&lt;/gi, '<')
+		.replace(/&gt;/gi, '>')
+		.replace(/&quot;/gi, '"')
+		.replace(/&#039;/gi, '\'')
+	)
+		.trim()
+		.replace(/\s+/g,'+')
+}
+/**
+ * @param  {RegExp} regexp
+ * @return {RegExp}
+ */
+function cloneRegExp(regexp) {
+	return new RegExp(regexp.source, regexp.flags)
+}
+/**
+ * @param  {String} name
+ * @return {RegExp}
+ */
+function getRegExp(name) {
+	return cloneRegExp(
+		REGULAR_EXPRESSIONS[name] || new Regexp('','')
+	)
+}
+/**
+ * @return {Object}
+ */
+function getAllRegExp() {
+	return Object
+		.entries(REGULAR_EXPRESSIONS)
+		.reduce((obj, [key, regexp]) => {
+			obj[key] = cloneRegExp(regexp)
+			return obj
+		}, {})
+}
+/**
+ * @param  {Object} config
+ * @param  {String} css
+ * @return {Array}
+ */
+function transformCss(config, css) {
+	let fonts = []
+	let replacements = []
+	let re = getAllRegExp()
+	let i = 1
+
+	while((match1 = re.face.exec(css)) !== null) {
+		[fontface, comment] = match1;
+		[, family]   = re.family.exec(fontface);
+		[, weight]   = re.weight.exec(fontface)
+		// Clone for reset lastIndex
+		let re_url   = cloneRegExp(re.url)
+		while((match2 = re.url.exec(fontface)) !== null) {
+			[forReplace, url] = match2
+			let urlPathname = parseUrl(url).pathname
+			let ext         = path.extname(urlPathname)
+			let filename    = path.basename(urlPathname, ext)
+			let newFilename = format(config.template, {
+				 comment: comment  || '',
+				  family: family   || '',
+				  weight: weight   || '',
+				filename: filename || '',
+				     ext: ext.replace(/^\./,'') || '',
+						   i: i++
+			}).replace(/\.$/,'')
+			fonts.push({
+				 input: url,
+				output: newFilename
+			})
+			replacements.push({
+				 input: forReplace,
+				output: `url('${config.path}${newFilename}')`
+			})
+		}
 	}
-	families = newFamilies.join('|')
-	subsets  = subsets.join(',')
-	return getByQuery(
-		(families.length > 0 ? `family=${families}` : '')+
-		((families.length > 0 && subsets.length > 0) ? '&' : '')+
-		(subsets.length > 0 ? `subset=${subsets}` : '')
-	,config)
+
+	replacements
+		.forEach(({input, output}) => {
+			css = css.replace(input, output)
+		})
+
+	return [css, fonts]
+}
+/**
+ * @param  {Object} config
+ * @param  {Array}  css_fonts_url
+ * @return {Arrau}
+ */
+function normalizeFonts(config, [css, fonts, url]) {
+	return [
+		css,
+		fonts.map(({input, output}) => {
+			return {
+				 input: URL.resolve(url, input),
+				output: output
+			}
+		})
+	]
+}
+/**
+ * Save files
+ * @param  {Object} config
+ * @param  {Array}  css_fonts
+ * @return {Object}
+ */
+function saveFiles(config, [css, fonts]) {
+	if(!config.simulate)
+		mkdirp(config.outputDir)
+	let res = Q()
+	fonts
+		.forEach(({input, output}) => {
+			res = res.then(() => {
+				let deferred  = Q.defer()
+				if(config.verbose)
+					console.log(`Saving ${output}`)
+				let req = request({
+					url: input,
+					header: {
+						'User-Agent': config.userAgent
+					}
+				})
+				.on('error', e => {
+					deferred.reject(new Error(e))
+				})
+				.on('response', res => {
+					deferred.resolve()
+				})
+				let file = path.resolve(config.outputDir, output)
+				if(!config.simulate
+				&&(config.overwriting
+				  || !fs.existsSync(file)))
+					req.pipe(fs.createWriteStream(file))
+				return deferred.promise
+			})
+		})
+	res.then(() => {
+		let deferred  = Q.defer()
+		let file = path.resolve(config.outputDir, config.cssFile)
+		if(config.verbose)
+			console.log(`Saving ${path.basename(config.cssFile)}`)
+		if(!config.simulate&&(config.overwriting||!fs.existsSync(file))) {
+			fs.writeFile(file, css, 'utf8', e => {
+				if(e) {
+					deferred.reject(new Error(e))
+					return;
+				}
+				deferred.resolve()
+			})
+		} else deferred.resolve()
+		return deferred.promise
+	})
+	return res
 }
 
-module.exports = {
-	byUrl: getByUrl,
-	byQuery: getByQuery,
-	byObject: getByObject
+module.exports = class GetGoogleFonts {
+	/**
+	 * @param {Object} config
+	 */
+	constructor(config={}) {
+		this.setConfig(config)
+	}
+	/**
+	 * Set new config
+	 * @param  {Object}  config
+	 * @param  {Boolean} reset
+	 * @return {Object}
+	 */
+	setConfig(config={}, reset=true) {
+		this.config = filterConfig(Object.assign(
+			{},
+			DEFAULT_CONFIG,
+			reset ? {} : this.config,
+			config
+		))
+		return this
+	}
+	/**
+	 * @return {Object}
+	 */
+	getConfig() {
+		return filterConfig(Object.assign(
+			{}, DEFAULT_CONFIG, this.config
+		))
+	}
+	/**
+	 * @param  {String} url
+	 * @param  {Object} config
+	 * @return {Array}
+	 */
+	repairInput(url, config={}) {
+		if(url instanceof Array === false
+		&& typeof url !== 'string')
+			throw new TypeError('URL must be an array or string')
+		return [
+			Array.isArray(url) ? this.constructor.constructUrl(...url) : repairUrl(url),
+			filterConfig(Object.assign(
+				{}, DEFAULT_CONFIG, this.config,
+				config instanceof Object ? config : {}
+			))
+		]
+	}
+	/**
+	 * Generate URL based on given data
+	 * @param  {Object} families
+	 * @param  {Array}  subsets
+	 * @return {String}
+	 */
+	static constructUrl(families={}, subsets=[]) {
+		if(families instanceof Object === false)
+			families = {}
+		families = Object
+			.entries(families)
+			.map(([family, weights]) =>
+				[
+					String(family)
+						.trim()
+						.replace(/\s+/g, '+')
+						.replace(/[^a-z0-9+-_]/gi,''),
+					arrayFrom(weights,',')
+						.map(weight => weight.trim())
+						.filter(weight => /^\d{3}i?$/.test(weight))
+				]
+			)
+			.reduce((newFamilies, [thisFamily, thisWeights]) => {
+				// Reduce non-unique fonts
+				let found = false
+				newFamilies.forEach(([family, weights], index) => {
+					if(family === thisFamily) {
+						found = true
+						newFamilies[index][1] = [...weights, ...thisWeights]
+							.filter( (weight, index, arr) => arr.indexOf(weight) === index )
+					}
+				})
+				if(!found)
+					newFamilies.push([thisFamily, thisWeights])
+				return newFamilies
+			}, [])
+			.map(([family, weights]) =>
+				[
+					family,
+					weights.join(',').trim()
+				]
+				.filter(x => x.length)
+				.join(':')
+			)
+			.join('|')
+		subsets = arrayFrom(subsets)
+			.map(subset => subset.trim().toLowerCase())
+			.filter(subset => /[a-z-]+/.test(subset))
+			.join(',')
+		return `https://fonts.googleapis.com/css?family=${families}&subset=${subsets}`
+			.replace('?family=&','?')
+			.replace(/subset=$/,'')
+	}
+	/**
+	 * Download given fonts
+	 * @param  {String|Array} url
+	 * @param  {Object}       config
+	 * @return {Promise}
+	 */
+	download(url, config={}) {
+		[url, config] = this.repairInput(url, config)
+		let timeStart = Date.now()
+		if(config.verbose)
+			console.log(`Downloading CSS from URL: ${url}`)
+		return downloadString(url, config)
+			.then(({time, statusCode, result}) => {
+				if(config.verbose)
+					console.log(`Downloaded CSS with status code: ${statusCode} in ${time}ms`)
+				return statusCode >= 400 ? '' : result
+			})
+			.then(transformCss.bind(null, config))
+			.then(([css, fonts]) => {
+				if(config.verbose)
+					console.log(`Found reference to ${fonts.length} fonts`)
+				return [css, fonts, url]
+			})
+			.then(normalizeFonts.bind(null, config))
+			.then(saveFiles.bind(null, config))
+			.then(x => {
+				if(config.verbose)
+					console.log(`Done in ${Date.now() - timeStart}ms`)
+				return x
+			})
+	}
 }
