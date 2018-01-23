@@ -3,42 +3,43 @@ process.on('uncaughtException', e => {
 })
 
 const Q = require('q')
-const MAIN_SCRIPT = './main.js'
-const DEFAULT_CONFIG = {
-	verbose: false,
+const ggf = require('./main.js')
+const DEFAULT_GGF = new ggf({
+	verbose: true,
 	simulate: false,
 	overwriting: false,
-}
-const ggf = require(MAIN_SCRIPT)
-const DEFAULT_GGF = new ggf()
+})
 
 let tests = [
 	// String @import
-	'https://fonts.googleapis.com/css?family=Lato:100i,400,700,900i|Roboto+Condensed:300,400,400i|Supermercado+One&subset=cyrillic,greek,vietnamese',
+	'https://fonts.googleapis.com/css?family=Roboto:400,700&subset=cyrillic',
 	// String <link> (with special characters)
-	'https://fonts.googleapis.com/css?family=Lato:100i,400,700,900i|Roboto+Condensed:300,400,400i|Supermercado+One&amp;subset=cyrillic,greek,vietnamese',
+	'https://fonts.googleapis.com/css?family=Lobster&amp;subset=vietnamese',
 	// Constructed
 	ggf.constructUrl({
-		Lato: ['100i','400','700','900i'],
-		'Roboto Condensed': ['300','400','400i'],
-		'Supermercado One': []
+		Rajdhani: [700]
 	}, [
-		'cyrillic', 'greek', 'vietnamese'
+		'devanagari'
 	]),
 	// Pass array for construct
 	[{
-		Lato: ['100i','400','700','900i'],
-		'Roboto Condensed': '300,400',
-		'Roboto+Condensed': ['400i'],
-		'Supermercado One': []
+		'Alegreya Sans SC': ['700', '700i'],
+		'Alegreya+Sans+SC': ['400', '400i']
 	}, [
-		'cyrillic', 'greek', 'vietnamese'
+		'greek'
 	]],
 	// Non-google's
-	'http://weloveiconfonts.com/api/?family=entypo|fontawesome|fontelico|maki|zocial'
+	'http://weloveiconfonts.com/api/?family=entypo'
 ]
 
 let res = Q()
 tests.forEach((x, i) => {
-	res = res.then(DEFAULT_GGF.download.bind(DEFAULT_GGF, x, DEFAULT_CONFIG))
+	res = res.then(DEFAULT_GGF.download.bind(DEFAULT_GGF, x, {
+		outputDir: `./fonts/test${i+1}/`
+	}))
+})
+res.then(() => {
+	require('child_process').spawn('start',['.\\test.html'], {
+		shell: true
+	})
 })
