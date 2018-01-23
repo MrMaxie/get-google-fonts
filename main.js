@@ -168,8 +168,8 @@ function transformCss(config, css) {
 	while((match1 = re.face.exec(css)) !== null) {
 		[fontface, comment] = match1;
 		[, family]   = re.family.exec(fontface);
-		family = family || ''
-		[, weight]   = re.weight.exec(fontface)
+		family = family || '';
+		[, weight]   = re.weight.exec(fontface);
 		// Clone for reset lastIndex
 		let re_url   = cloneRegExp(re.url)
 		while((match2 = re.url.exec(fontface)) !== null) {
