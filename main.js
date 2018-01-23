@@ -175,6 +175,8 @@ function transformCss(config, css) {
 			[forReplace, url] = match2
 			let urlPathname = parseUrl(url).pathname
 			let ext         = path.extname(urlPathname)
+			if(ext.length < 2)
+				continue;
 			let filename    = path.basename(urlPathname, ext)
 			let newFilename = format(config.template, {
 				 comment: comment  || '',
@@ -338,7 +340,7 @@ module.exports = class GetGoogleFonts {
 						.replace(/\s+/g, '+')
 						.replace(/[^a-z0-9+-_]/gi,''),
 					arrayFrom(weights,',')
-						.map(weight => weight.trim())
+						.map(weight => String(weight).trim())
 						.filter(weight => /^\d{3}i?$/.test(weight))
 				]
 			)
