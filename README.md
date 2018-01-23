@@ -13,7 +13,7 @@ npm install get-google-fonts
 
 For example CSS with fonts used like this:
 ```html
-<link href='https://fonts.googleapis.com/css?family=Roboto:400,700&subset=cyrillic' rel='stylesheet'>
+<link href='https://fonts.googleapis.com/css?family=Roboto:400,700&amp;subset=cyrillic' rel='stylesheet'>
 ```
 
 Can be replaced with:
