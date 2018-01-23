@@ -168,6 +168,7 @@ function transformCss(config, css) {
 	while((match1 = re.face.exec(css)) !== null) {
 		[fontface, comment] = match1;
 		[, family]   = re.family.exec(fontface);
+		family = family || ''
 		[, weight]   = re.weight.exec(fontface)
 		// Clone for reset lastIndex
 		let re_url   = cloneRegExp(re.url)
@@ -180,10 +181,10 @@ function transformCss(config, css) {
 			let filename    = path.basename(urlPathname, ext) || ''
 			let newFilename = format(config.template, {
 				 comment: comment  || '',
-				  family: family   || '',
+				  family: family,
 				  weight: weight   || '',
 				filename: filename,
-			 _filename: filename.replace(/\s+/g, '_'),
+			 _family: family.replace(/\s+/g, '_'),
 				     ext: ext.replace(/^\./,'') || '',
 						   i: i++
 			}).replace(/\.$/,'')
