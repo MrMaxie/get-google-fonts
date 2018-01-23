@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const cli = require('cli')
 const GGF = require('./main.js')
 

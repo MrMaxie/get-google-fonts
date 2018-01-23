@@ -1,6 +1,6 @@
 {
   "name": "get-google-fonts",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Downloads and adapts Google fonts to working offline",
   "main": "main.js",
 	"preferGlobal": true,
@@ -11,9 +11,7 @@
     "type": "git",
     "url": "git+https://github.com/MrMaxie/get-google-fonts.git"
   },
-  "bin": {
-    "get-google-fonts": "cli.js"
-  },
+  "bin": "./cli.js",
   "keywords": [
     "google",
     "fonts",
