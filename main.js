@@ -177,13 +177,13 @@ function transformCss(config, css) {
 			let ext         = path.extname(urlPathname)
 			if(ext.length < 2)
 				continue;
-			let filename    = path.basename(urlPathname, ext)
+			let filename    = path.basename(urlPathname, ext) || ''
 			let newFilename = format(config.template, {
 				 comment: comment  || '',
 				  family: family   || '',
 				  weight: weight   || '',
-				filename: filename || '',
-			 _filename: (filename || '').replace(/\s+/g, '_'),
+				filename: filename,
+			 _filename: filename.replace(/\s+/g, '_'),
 				     ext: ext.replace(/^\./,'') || '',
 						   i: i++
 			}).replace(/\.$/,'')
