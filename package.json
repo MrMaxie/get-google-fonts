@@ -1,11 +1,12 @@
 {
   "name": "get-google-fonts",
-  "version": "1.0.7",
+  "version": "1.0.10",
   "description": "Downloads and adapts Google fonts to working offline",
   "main": "main.js",
-	"preferGlobal": true,
+  "preferGlobal": true,
   "scripts": {
-    "test": "node ./test.js"
+    "test": "node ./test.js",
+    "prepublishOnly": "crlf --set=LF *.js"
   },
   "repository": {
     "type": "git",
@@ -26,6 +27,9 @@
     "url": "https://github.com/MrMaxie/get-google-fonts/issues"
   },
   "homepage": "https://github.com/MrMaxie/get-google-fonts#readme",
+  "devDependencies": {
+    "crlf": "1.1.1"
+  },
   "dependencies": {
     "q": "1.5.1",
     "mkdirp": "0.5.1",

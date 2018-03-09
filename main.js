@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * @name    Get-Google-Fonts
  * @author  Maciej (Maxie) Mieńko

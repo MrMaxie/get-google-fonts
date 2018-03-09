@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 process.on('uncaughtException', e => {
 	console.log(`%c ${e.stack}`, 'color: red;')
 })
