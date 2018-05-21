@@ -18,6 +18,7 @@ let res = cli.parse({
 	template:    ['t', 'Template of font filename', 'string',  dc.template],
 	useragent:   ['u', 'User-agent used at every connection', 'string', false],
 	quiet:       ['q', 'Don\'t displays a lot of useful information', 'true', false],
+	base64:      ['b', 'Save fonts inside CSS file as base64 URIs', 'true', false],
 	overwriting: ['w', 'Allows overwrite existing files', 'true', false],
 	simulate:    ['s', 'Simulation; No file will be saved', 'true', false]
 })
@@ -31,6 +32,7 @@ ggf.download(
 		userAgent: res.useragent || dc.userAgent,
 		  verbose: !res.quiet,
 	overwriting: res.overwriting,
+	     base64: req.base64,
 	   simulate: res.simulate,
 		 template: res.template
 	}

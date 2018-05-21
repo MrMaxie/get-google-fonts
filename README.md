@@ -43,6 +43,7 @@ Options:
                          user-agent will end with the download of .ttf fonts.
                          Default user-agent downloads .woff2 fonts.
   -q, --quiet TRUE       Don't displays a lot of useful information. Inverse of "verbose".
+  -b, --base64 TRUE      Save fonts inside CSS file as base64 URIs
   -w, --overwriting TRUE Allows overwrite existing files.
   -s, --simulate TRUE    Simulation; No file will be saved.
   -h, --help             Display help and usage details.
@@ -162,6 +163,8 @@ Download config > GetGoogleFonts object config > Default config
 	// Default user-agent downloads .woff2 fonts.
 	userAgent:  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
 	            '(KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
+	// Save fonts inside CSS file as base64 URIs
+	base64: false,
 	// Allows overwrite existing files.
 	overwriting: false,
 	// Displays a lot of useful information.

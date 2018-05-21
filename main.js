@@ -26,6 +26,7 @@ const DEFAULT_CONFIG = {
 	cssFile:    'fonts.css',
 	userAgent:  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
 							'(KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
+	base64:      false,
 	overwriting: false,
 	verbose:     false,
 	simulate:    false
@@ -190,20 +191,13 @@ function transformCss(config, css) {
 						   i: i++
 			}).replace(/\.$/,'')
 			fonts.push({
-				 input: url,
-				output: newFilename
-			})
-			replacements.push({
-				 input: forReplace,
-				output: `url('${config.path}${newFilename}')`
+				 inputFont: url,
+				outputFont: newFilename,
+				 inputText: forReplace,
+				outputText: `url('${config.path}${newFilename}')`
 			})
 		}
 	}
-
-	replacements
-		.forEach(({input, output}) => {
-			css = css.replace(input, output)
-		})
 
 	return [css, fonts]
 }
@@ -215,10 +209,12 @@ function transformCss(config, css) {
 function normalizeFonts(config, [css, fonts, url]) {
 	return [
 		css,
-		fonts.map(({input, output}) => {
+		fonts.map(({inputFont, outputFont, inputText, outputText}) => {
 			return {
-				 input: URL.resolve(url, input),
-				output: output
+				 inputFont: URL.resolve(url, inputFont),
+				outputFont: outputFont,
+				 inputText: inputText,
+				outputText: outputText,
 			}
 		})
 	]
@@ -230,32 +226,75 @@ function normalizeFonts(config, [css, fonts, url]) {
  * @return {Object}
  */
 function saveFiles(config, [css, fonts]) {
-	if(!config.simulate)
-		mkdirp(config.outputDir)
-	let res = Q()
+
+	let res = Q().then(() => {
+		let deferred = Q.defer()
+		if(!config.simulate) {
+			mkdirp(config.outputDir, error => {
+				if(error) {
+					deferred.reject(new Error(error))
+				} else {
+					deferred.resolve()
+				}
+			})
+		} else {
+			deferred.resolve()
+		}
+		return deferred.promise
+	})
 	fonts
-		.forEach(({input, output}) => {
+		.forEach(({inputFont, outputFont, inputText, outputText}) => {
 			res = res.then(() => {
-				let deferred  = Q.defer()
+				let deferred = Q.defer()
+				let mime = 'font/woff2' // For Base64
 				if(config.verbose)
-					console.log(`Saving ${output}`)
+					console.log(config.base64 ?
+						`Writing in file ${inputFont}` :
+						`Saving ${outputFont}`)
 				let req = request({
-					url: input,
+					url: inputFont,
 					header: {
 						'User-Agent': config.userAgent
+					}
+				})
+				.on('response', response => {
+					if(config.base64) {
+						mime = response.headers['content-type'] || 'font/woff2'
+						deferred.resolve()
 					}
 				})
 				.on('error', e => {
 					deferred.reject(new Error(e))
 				})
-				.on('response', res => {
-					deferred.resolve()
-				})
-				let file = path.resolve(config.outputDir, output)
-				if(!config.simulate
-				&&(config.overwriting
-				  || !fs.existsSync(file)))
-					req.pipe(fs.createWriteStream(file))
+				if(!config.base64) {
+					let file = path.resolve(config.outputDir, outputFont)
+					css = css.replace(inputText, outputText);
+					if(!config.simulate
+					&&(config.overwriting
+					  || !fs.existsSync(file))) {
+						req.pipe(fs.createWriteStream(file))
+						req.on('end', () => {
+							deferred.resolve()
+						})
+					} else {
+						if(!config.overwriting
+						|| fs.existsSync(file)) {
+							if(config.verbose)
+								console.log('Passing - overwriting is disabled')
+						}
+						deferred.resolve()
+					}
+				} else {
+					let chunks = []
+					req.on('data', chunk => {
+						chunks.push(chunk)
+					}).on('end', (x) => {
+						res = res.then(() => {
+							let body = Buffer.concat(chunks).toString('base64')
+							css = css.replace(inputText, `url('data:${mime};base64,${body}')`)
+						})
+					})
+				}
 				return deferred.promise
 			})
 		})

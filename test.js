@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-process.on('uncaughtException', e => {
-	console.log(`%c ${e.stack}`, 'color: red;')
-})
-
 const Q = require('q')
 const ggf = require('./main.js')
 const DEFAULT_GGF = new ggf({
@@ -30,13 +26,16 @@ let tests = [
 		'greek'
 	]],
 	// Non-google's
-	'http://weloveiconfonts.com/api/?family=entypo'
+	'http://weloveiconfonts.com/api/?family=entypo',
+	// For Base64 comparison
+	'https://fonts.googleapis.com/css?family=Lobster&amp;subset=vietnamese',
 ]
 
 let res = Q()
 tests.forEach((x, i) => {
 	res = res.then(DEFAULT_GGF.download.bind(DEFAULT_GGF, x, {
-		outputDir: `./fonts/test${i+1}/`
+		outputDir: `./fonts/test${i+1}/`,
+		base64: i === 5
 	}))
 })
 res.then(() => {
