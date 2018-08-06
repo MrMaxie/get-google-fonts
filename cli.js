@@ -32,7 +32,7 @@ ggf.download(
 		userAgent: res.useragent || dc.userAgent,
 		  verbose: !res.quiet,
 	overwriting: res.overwriting,
-	     base64: req.base64,
+	     base64: res.base64,
 	   simulate: res.simulate,
 		 template: res.template
 	}
