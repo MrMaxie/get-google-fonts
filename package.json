@@ -1,6 +1,6 @@
 {
   "name": "get-google-fonts",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Downloads and adapts Google fonts to working offline",
   "main": "main.js",
   "preferGlobal": true,
