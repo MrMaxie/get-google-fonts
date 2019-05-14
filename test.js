@@ -7,6 +7,15 @@ const DEFAULT_GGF = new ggf({
 	overwriting: false,
 })
 
+// For testing purposes
+process.on('uncaughtException', (err) => {
+	console.log(err);
+});
+
+process.on('unhandledRejection', (err) => {
+	console.log(err);
+});
+
 let tests = [
 	// String @import
 	'https://fonts.googleapis.com/css?family=Roboto:400,700&subset=cyrillic',
