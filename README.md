@@ -30,23 +30,22 @@ Usage:
   get-google-fonts [OPTIONS] [ARGS]
 
 Options:
-  -i, --input URL        Input URL of CSS with fonts. Works best with google-fonts but not only.
-  -o, --output [STRING]  Output directory when where all files will be saved.
-                         According to this path, relative paths will be resolved. (Default is ./fonts)
-  -p, --path [STRING]    Path placed before every source of font in CSS.
-                         It's also can be URL of your website. (Default is ./)
-  -c, --css [STRING]     Name of CSS file. Like other files
-                         will be placed relative to output directory (Default is fonts.css)
-  -t, --template STRING  Template of font filename. (Default is {_family}-{weight}-{comment}{i}.{ext})
-  -u, --useragent STRING User-agent used at every connection. Accordingly, Google Fonts will
-                         send the appropriate fonts. For example, providing a wget's
-                         user-agent will end with the download of .ttf fonts.
-                         Default user-agent downloads .woff2 fonts.
-  -q, --quiet TRUE       Don't displays a lot of useful information. Inverse of "verbose".
-  -b, --base64 TRUE      Save fonts inside CSS file as base64 URIs
-  -w, --overwriting TRUE Allows overwrite existing files.
-  -s, --simulate TRUE    Simulation; No file will be saved.
-  -h, --help             Display help and usage details.
+  -i, --input URL         Input URL of CSS with fonts
+  -o, --output [STRING]   Output directory (Default is ./fonts)
+  -p, --path [STRING]     Path placed before every source of font in CSS  (Default is ./)
+  -c, --css [STRING]      Name of CSS file (Default is fonts.css)
+  -t, --template [STRING] Template of font filename (Default is {_family}-{weight}-{comment}{i}.{ext})
+  -u, --useragent STRING  User-agent used at every connection
+  -q, --quiet             Don't displays a lot of useful information
+  -b, --base64            Save fonts inside CSS file as base64 URIs
+	  --non-strict-ssl    Force to accepts only valid SSL certificates; in some
+						  cases,such proxy or self-signed certificates
+						  should be turned off
+  -w, --overwriting       Allows overwrite existing files
+	  --print-options     Shows result options object without performing any
+						  action
+  -s, --simulate          Simulation; No file will be saved
+  -h, --help              Display help and usage details
 ```
 
 To get a result like in [Example](#Example-Result), just enter the command in the folder with the HTML file:
@@ -162,9 +161,12 @@ Download config > GetGoogleFonts object config > Default config
 	// user-agent will end with the download of .ttf fonts.
 	// Default user-agent downloads .woff2 fonts.
 	userAgent:  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-	            '(KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
+				'(KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
 	// Save fonts inside CSS file as base64 URIs
-	base64: false,
+	base64:      false,
+	// Force to accepts only valid SSL certificates; in some cases,
+	// such proxy or self-signed certificates should be turned off
+	strictSSL:   true,
 	// Allows overwrite existing files.
 	overwriting: false,
 	// Displays a lot of useful information.
