@@ -10,7 +10,6 @@ const parseUrl      = url => URL.parse(url,true,true)
 const path          = require('path')
 const fs            = require('fs')
 const mkdirp        = require('mkdirp')
-const request       = require('request')
 const normalizeUrl  = require('normalize-url')
 
 const REGULAR_EXPRESSIONS = {
@@ -24,10 +23,13 @@ const DEFAULT_CONFIG = {
 	path:       './',
 	template:   '{_family}-{weight}-{comment}{i}.{ext}',
 	cssFile:    'fonts.css',
-	userAgent:  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
-							'(KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
+	userAgent:  [
+		'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+		'(KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36',
+	].join(' '),
 	base64:      false,
 	overwriting: false,
+	strictSSL:   true,
 	verbose:     false,
 	simulate:    false
 }
@@ -79,13 +81,14 @@ function filterConfig(config) {
  * @param  {String}  url
  * @return {Promise}
  */
-function downloadString(url, {userAgent}) {
+function downloadString(url, {userAgent, strictSSL}) {
 	let deferred  = Q.defer()
 	let startTime = Date.now()
 	let data = ''
 	request({
 		method: 'GET',
 		url: url,
+		strictSSL: strictSSL,
 		headers: {
 			'User-Agent': userAgent
 		}
@@ -253,6 +256,7 @@ function saveFiles(config, [css, fonts]) {
 						`Saving ${outputFont}`)
 				let req = request({
 					url: inputFont,
+					strictSSL: config.strictSSL,
 					header: {
 						'User-Agent': config.userAgent
 					}
