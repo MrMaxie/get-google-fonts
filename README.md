@@ -187,11 +187,6 @@ Following variables can be used in the template:
 - `{ext}` Original extension e.g. woff2
 - `{i}` A number that is incremented one by one each time a font file is added. Useful to preserve the uniqueness of font names in case you are not sure if the previous variables are enough. **It starts from 1.**
 
-## TODO
-
-- [ ] Some kind of .lock file for making changes based on the last known state
-- [ ] CSS scanning ability for self-recognize by script what must to be downloaded (with or without watchers)
-
 ## License
 
 This project is licensed under the Apache-2.0 License - see the [LICENSE.md](LICENSE.md) file for details
