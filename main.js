@@ -10,7 +10,7 @@ const parseUrl      = url => URL.parse(url,true,true)
 const path          = require('path')
 const fs            = require('fs')
 const mkdirp        = require('mkdirp')
-const request       = require('request')
+const https         = require('https')
 const normalizeUrl  = require('normalize-url')
 
 const REGULAR_EXPRESSIONS = {
@@ -86,10 +86,10 @@ function downloadString(url, {userAgent, strictSSL}) {
 	let deferred  = Q.defer()
 	let startTime = Date.now()
 	let data = ''
-	request({
+	https.get({
 		method: 'GET',
 		url: url,
-		strictSSL: strictSSL,
+		rejectUnauthorized: strictSSL,
 		headers: {
 			'User-Agent': userAgent
 		}
@@ -255,9 +255,9 @@ function saveFiles(config, [css, fonts]) {
 					console.log(config.base64 ?
 						`Writing in file ${inputFont}` :
 						`Saving ${outputFont}`)
-				let req = request({
+				let req = https.get({
 					url: inputFont,
-					strictSSL: config.strictSSL,
+					rejectUnauthorized: config.strictSSL,
 					header: {
 						'User-Agent': config.userAgent
 					}
