@@ -265,7 +265,6 @@ function saveFiles(config, [css, fonts]) {
 				.on('response', response => {
 					if(config.base64) {
 						mime = response.headers['content-type'] || 'font/woff2'
-						deferred.resolve()
 					}
 				})
 				.on('error', e => {
@@ -294,10 +293,9 @@ function saveFiles(config, [css, fonts]) {
 					req.on('data', chunk => {
 						chunks.push(chunk)
 					}).on('end', (x) => {
-						res = res.then(() => {
-							let body = Buffer.concat(chunks).toString('base64')
-							css = css.replace(inputText, `url('data:${mime};base64,${body}')`)
-						})
+						let body = Buffer.concat(chunks).toString('base64')
+						css = css.replace(inputText, `url('data:${mime};base64,${body}')`)
+						deferred.resolve()
 					})
 				}
 				return deferred.promise
