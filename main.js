@@ -83,26 +83,28 @@ function filterConfig(config) {
  * @return {Promise}
  */
 function downloadString(url, {userAgent, strictSSL}) {
-	let deferred  = Q.defer()
-	let startTime = Date.now()
+	const deferred  = Q.defer()
+	const startTime = Date.now()
 	let data = ''
-	https.get({
-		method: 'GET',
-		url: url,
+	https.get(url, {
 		rejectUnauthorized: strictSSL,
 		headers: {
 			'User-Agent': userAgent
 		}
-	}, function(error, response, body) {
-		if(error) {
-			deferred.reject(new Error(error))
-			return;
-		}
-		deferred.resolve({
-			time: Date.now() - startTime,
-			result: body,
-			statusCode: response.statusCode
+	}, response => {
+		response.on('data', chunk => {
+			data += chunk
 		})
+		response.on('end', () => {
+			deferred.resolve({
+				time: Date.now() - startTime,
+				result: data,
+				statusCode: response.statusCode
+			})
+		})
+	})
+	.on('error', error => {
+		deferred.reject(new Error(error))
 	})
 	return deferred.promise
 }
@@ -255,49 +257,47 @@ function saveFiles(config, [css, fonts]) {
 					console.log(config.base64 ?
 						`Writing in file ${inputFont}` :
 						`Saving ${outputFont}`)
-				let req = https.get({
-					url: inputFont,
+				let req = https.get(inputFont, {
 					rejectUnauthorized: config.strictSSL,
-					header: {
+					headers: {
 						'User-Agent': config.userAgent
 					}
-				})
-				.on('response', response => {
+				}, response => {
 					if(config.base64) {
 						mime = response.headers['content-type'] || 'font/woff2'
+					}
+					if(!config.base64) {
+						let file = path.resolve(config.outputDir, outputFont)
+						css = css.replace(inputText, outputText);
+						if(!config.simulate
+						&&(config.overwriting
+						  || !fs.existsSync(file))) {
+							response.pipe(fs.createWriteStream(file))
+							response.on('end', () => {
+								deferred.resolve()
+							})
+						} else {
+							if(!config.overwriting
+							|| fs.existsSync(file)) {
+								if(config.verbose)
+									console.log('Passing - overwriting is disabled')
+							}
+							deferred.resolve()
+						}
+					} else {
+						let chunks = []
+						response.on('data', chunk => {
+							chunks.push(chunk)
+						}).on('end', (x) => {
+							let body = Buffer.concat(chunks).toString('base64')
+							css = css.replace(inputText, `url('data:${mime};base64,${body}')`)
+							deferred.resolve()
+						})
 					}
 				})
 				.on('error', e => {
 					deferred.reject(new Error(e))
 				})
-				if(!config.base64) {
-					let file = path.resolve(config.outputDir, outputFont)
-					css = css.replace(inputText, outputText);
-					if(!config.simulate
-					&&(config.overwriting
-					  || !fs.existsSync(file))) {
-						req.pipe(fs.createWriteStream(file))
-						req.on('end', () => {
-							deferred.resolve()
-						})
-					} else {
-						if(!config.overwriting
-						|| fs.existsSync(file)) {
-							if(config.verbose)
-								console.log('Passing - overwriting is disabled')
-						}
-						deferred.resolve()
-					}
-				} else {
-					let chunks = []
-					req.on('data', chunk => {
-						chunks.push(chunk)
-					}).on('end', (x) => {
-						let body = Buffer.concat(chunks).toString('base64')
-						css = css.replace(inputText, `url('data:${mime};base64,${body}')`)
-						deferred.resolve()
-					})
-				}
 				return deferred.promise
 			})
 		})
