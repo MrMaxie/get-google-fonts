@@ -10,7 +10,7 @@ const parseUrl      = url => URL.parse(url,true,true)
 const path          = require('path')
 const fs            = require('fs')
 const mkdirp        = require('mkdirp')
-const https         = require('https')
+const https         = require('request')
 const normalizeUrl  = require('normalize-url')
 
 const REGULAR_EXPRESSIONS = {
