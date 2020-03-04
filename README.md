@@ -126,14 +126,14 @@ Parameters:
 Example:
 
 ```javascript
-GetGoogleFonts.constructUrl([
+GetGoogleFonts.constructUrl(
 	{
 		Roboto: ['400', 700],
 		'Roboto': [400, '700i'],
 		'Alegreya Sans SC': [300]
 	},
 	['cyrillic']
-])
+)
 // => https://fonts.googleapis.com/css?family=Roboto:400,700,700i|Alegreya+Sans+SC:300&subset=cyrillic
 ```
 
