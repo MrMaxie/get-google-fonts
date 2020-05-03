@@ -373,7 +373,7 @@ module.exports = class GetGoogleFonts {
 	 * @param  {Array}  subsets
 	 * @return {String}
 	 */
-	static constructUrl(families={}, subsets=[]) {
+	static constructUrl(families={}, subsets=[], display=auto) {
 		if(families instanceof Object === false)
 			families = {}
 		families = Object
@@ -416,7 +416,7 @@ module.exports = class GetGoogleFonts {
 			.map(subset => subset.trim().toLowerCase())
 			.filter(subset => /[a-z-]+/.test(subset))
 			.join(',')
-		return `https://fonts.googleapis.com/css?family=${families}&subset=${subsets}`
+		return `https://fonts.googleapis.com/css?family=${families}&display=${display}&subset=${subsets}`
 			.replace('?family=&','?')
 			.replace(/subset=$/,'')
 	}
