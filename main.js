@@ -373,7 +373,7 @@ module.exports = class GetGoogleFonts {
 	 * @param  {Array}  subsets
 	 * @return {String}
 	 */
-	static constructUrl(families={}, subsets=[], display=auto) {
+	static constructUrl(families={}, subsets=[], display="auto") {
 		if(families instanceof Object === false)
 			families = {}
 		families = Object
