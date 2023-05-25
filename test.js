@@ -35,7 +35,7 @@ let tests = [
 		'greek'
 	]],
 	// Non-google's
-	'http://weloveiconfonts.com/api/?family=entypo',
+	'https://fonts.bunny.net/css?family=lobster:400',
 	// For Base64 comparison
 	'https://fonts.googleapis.com/css?family=Lobster&amp;subset=vietnamese',
 ]
